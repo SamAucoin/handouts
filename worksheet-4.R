@@ -10,10 +10,10 @@ block, drug, control, placebo
 ## Pivot wide to long 
 
 library(tidyr)
-tidy_trial <- ...(trial,
-                  cols = ...,
-                  names_to = ...,
-                  values_to = ...)
+tidy_trial <- pivot_longer(trial,
+                  cols = c(drug,control,placebo),
+                  names_to = 'treatment',
+                  values_to = 'response')
 
 ## Pivot long to wide 
 
@@ -26,14 +26,14 @@ participant,   attr, val
 2          , income,  60
 ")
 
-tidy_survey <- ...(survey,
-                   names_from = ...,
-                   values_from = ...)
+tidy_survey <- pivot_wider(survey,
+                   names_from = attr,
+                   values_from = val)
 
 tidy_survey <- pivot_wider(survey,
                            names_from = attr,
                            values_from = val,
-                           values_fill = ...)
+                           values_fill = 0)
 
 ## Sample Data 
 
@@ -42,8 +42,9 @@ cbp <- fread('data/cbp15co.csv')
 
 cbp <- fread(
   'data/cbp15co.csv',
-  ...,
-  ...)
+  colClasses = c(
+    FIPSTATE='character',
+    FIPSCTY='character'))
 
 acs <- fread(
   'data/ACS/sector_ACS_15_5YR_S2413.csv',
@@ -51,33 +52,33 @@ acs <- fread(
 
 ## dplyr Functions 
 
-library(...)
-cbp2 <- filter(...,
-  ...,
+library(dplyr)
+cbp2 <- filter(cbp,
+  grepl('----',NAICS),
   !grepl('------', NAICS))
 
-library(...)
+library(stringr)
 cbp2 <- filter(cbp,
-  ...)
+  str_detect(NAICS,'[0-9]{2}----'))
 
-cbp3 <- mutate(...,
-  ...)
+cbp3 <- mutate(cbp2,
+  FIPS = str_c(FIPSTATE, FIPSCTY))
 
 cbp3 <- mutate(cbp2,
   FIPS = str_c(FIPSTATE, FIPSCTY),
-  ...)
+  NAICS = str_remove(NAICS, '-+'))
 
-...
+cbp <- cbp %>%
   filter(
     str_detect(NAICS, '[0-9]{2}----')
-  ) ...
+  ) %>%
   mutate(
     FIPS = str_c(FIPSTATE, FIPSCTY),
     NAICS = str_remove(NAICS, '-+')
   )
 
-...
-  ...(
+cbp <- cbp %>%
+  select(
     FIPS,
     NAICS,
     starts_with('N')
@@ -90,19 +91,46 @@ sector <- fread(
   colClasses = c(NAICS = 'character'))
 
 cbp <- cbp %>%
-  ...
+  inner_join(sector)
 
 ## Group By 
 
 cbp_grouped <- cbp %>%
-  ...
+  group_by(FIPS, Sector)
 
 ## Summarize 
 
 cbp <- cbp %>%
   group_by(FIPS, Sector) %>%
-  ...
-  ...
+  select(starts_with('N'),-NAICS) %>%
+  summarise_all(sum)
 
-acs_cbp <- ... %>%
-  ...
+acs_cbp <- cbp %>%
+  inner_join(acs)
+
+
+colname <- colnames(tidy_survey)
+long_survey <- pivot_longer(tidy_survey,  
+                            cols=c(colname[2], colname[3]), 
+                            values_to = 'val', 
+                            names_to = 'attr', 
+)
+
+
+cbp_23 <- fread('data/cbp15co.csv', na.strings = '') %>%
+  filter(NAICS == '23----') %>%
+  select(starts_with('FIPS'), starts_with('AP'))
+
+
+cbp_21 <- fread('data/cbp15co.csv', na.strings = '') %>%
+  filter(NAICS == '21----') %>%
+  group_by(FIPSTATE) %>%
+  summarize(EMP = sum(EMP), counties = n())
+
+
+pivot <- fread('data/cbp15co.csv', na.strings = '') %>%
+  filter(str_detect(NAICS, '[0-9]{2}----')) %>%
+  group_by(FIPSTATE, NAICS) %>%
+  summarize(EMP = sum(EMP)) %>%
+  pivot_wider(names_from = NAICS, values_from = EMP)
+
